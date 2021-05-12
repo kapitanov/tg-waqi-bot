@@ -1,0 +1,14 @@
+docker-compose.yaml
+.idea
+.github
+docs
+LICENSE
+README.md
+Dockerfile
+artifacts
+tg-waqi-bot
+tg-waqi-bot.exe
+.git
+.editorconfig
+.env
+var

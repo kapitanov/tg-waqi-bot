@@ -1,0 +1,13 @@
+version: ""
+services:
+  habrabot:
+    image: tg-waqi-bot:latest
+    build:
+      context: .
+    env_file: ./.env
+    volumes:
+      - ./var/:/var/tg-waqi-bot
+    environment:
+      AQI_CACHE_PATH: /var/tg-waqi-bot/cache
+      BOT_DB_PATH: /var/tg-waqi-bot/bot.dat
+    restart: always
