@@ -11,7 +11,8 @@ This bot is non-public due to waqi.info API restrictions, so you'll need to set 
 
    ```shell
    cd /opt
-   git clone git@github.com:kapitanov/tg-waqi-bot.git
+   git clone https://github.com/kapitanov/tg-waqi-bot.git
+   cd tg-waqi-bot
    ```
 
 2. Create a `.env` file (see [configuration](#configuration) section below):
