@@ -187,7 +187,7 @@ func (f *stationFetcher) Update() {
 	prevStatus := f.prevStatus
 	f.prevStatus = status
 
-	if prevStatus == nil || prevStatus.Equal(status) {
+	if prevStatus == nil || prevStatus.Equal(status) || prevStatus.Level == status.Level {
 		return
 	}
 
