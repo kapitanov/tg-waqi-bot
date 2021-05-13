@@ -8,6 +8,7 @@ RUN go mod download
 
 COPY . .
 RUN GOOS=linux GOARCH=amd64 go build -o /out/bot
+RUN go test -v ./...
 COPY ./www /out/www
 
 FROM alpine:latest

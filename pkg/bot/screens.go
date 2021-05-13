@@ -2,39 +2,47 @@ package bot
 
 import (
 	"fmt"
-	"github.com/enescakir/emoji"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
-	"gopkg.in/tucnak/telebot.v2"
+	"log"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/enescakir/emoji"
+	"gopkg.in/tucnak/telebot.v2"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 )
 
-func sendForbiddenScreen(bot *telebot.Bot, to telebot.Recipient) error {
+type botScreens struct {
+	bot    *telebot.Bot
+	logger *log.Logger
+}
+
+func (s *botScreens) ForbiddenScreen(to telebot.Recipient) error {
 	text := fmt.Sprintf("%s Sorry, this bot is private. You are not in allowed user list.", emoji.NoEntry)
 
 	markup := &telebot.ReplyMarkup{
 		ReplyKeyboardRemove: true,
 	}
 
-	_, err := bot.Send(to, text, markup, telebot.ModeHTML)
-	log.Printf("sent ForbiddenScreen to %s", to.Recipient())
+	_, err := s.bot.Send(to, text, markup, telebot.ModeHTML)
+	s.logger.Printf("sent ForbiddenScreen to %s", to.Recipient())
 	return err
 }
 
-func sendErrorScreen(bot *telebot.Bot, to telebot.Recipient) error {
+func (s *botScreens) ErrorScreen(to telebot.Recipient) error {
 	text := fmt.Sprintf("%s Error! Something went wrong on server side", emoji.ExclamationMark)
 
 	markup := &telebot.ReplyMarkup{
 		ReplyKeyboardRemove: true,
 	}
 
-	_, err := bot.Send(to, text, markup, telebot.ModeHTML)
-	log.Printf("sent ErrorScreen to %s", to.Recipient())
+	_, err := s.bot.Send(to, text, markup, telebot.ModeHTML)
+	s.logger.Printf("sent ErrorScreen to %s", to.Recipient())
 	return err
 }
 
-func sendWelcomeScreen(bot *telebot.Bot, to telebot.Recipient, message telebot.Editable) error {
+func (s *botScreens) WelcomeScreen(to telebot.Recipient, message telebot.Editable) error {
 	text := fmt.Sprintf(
 		"%s This Bot helps you track air quality at any location.\nSend me a location to get its current air quality index.",
 		emoji.Umbrella)
@@ -51,11 +59,11 @@ func sendWelcomeScreen(bot *telebot.Bot, to telebot.Recipient, message telebot.E
 		OneTimeKeyboard: true,
 	}
 
-	return sendScreen("WelcomeScreen", bot, to, message, text, markup, telebot.ModeHTML)
+	return s.sendScreen("WelcomeScreen", to, message, text, markup, telebot.ModeHTML)
 }
 
-func sendLocationScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.Status, message telebot.Editable) error {
-	text := generateStatusScreen(status)
+func (s *botScreens) LocationScreen(to telebot.Recipient, status *waqi.Status, message telebot.Editable) error {
+	text := s.generateStatusScreen(status)
 
 	uid := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	markup := &telebot.ReplyMarkup{
@@ -76,11 +84,11 @@ func sendLocationScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.Sta
 	}
 
 	name := fmt.Sprintf("LocationScreen(%d)", status.Station.ID)
-	return sendScreen(name, bot, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
+	return s.sendScreen(name, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
 }
 
-func sendSubscribedScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.Status, message telebot.Editable) error {
-	text := generateStatusScreen(status)
+func (s *botScreens) SubscribedScreen(to telebot.Recipient, status *waqi.Status, message telebot.Editable) error {
+	text := s.generateStatusScreen(status)
 
 	uid := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	markup := &telebot.ReplyMarkup{
@@ -101,15 +109,15 @@ func sendSubscribedScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.S
 	}
 
 	name := fmt.Sprintf("SubscribedScreen(%d)", status.Station.ID)
-	return sendScreen(name, bot, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
+	return s.sendScreen(name, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
 }
 
-func sendUpdatedScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.Status, prevStatus *waqi.Status, message telebot.Editable) error {
+func (s *botScreens) UpdatedScreen(to telebot.Recipient, status *waqi.Status, prevStatus *waqi.Status, message telebot.Editable) error {
 	if prevStatus == nil {
-		return sendSubscribedScreen(bot, to, status, message)
+		return s.SubscribedScreen(to, status, message)
 	}
 
-	text := generateDeltaStatusScreen(status, prevStatus)
+	text := s.generateDeltaStatusScreen(status, prevStatus)
 
 	uid := fmt.Sprintf("%d", time.Now().UTC().Unix())
 	markup := &telebot.ReplyMarkup{
@@ -130,10 +138,10 @@ func sendUpdatedScreen(bot *telebot.Bot, to telebot.Recipient, status *waqi.Stat
 	}
 
 	name := fmt.Sprintf("UpdatedScreen(%d)", status.Station.ID)
-	return sendScreen(name, bot, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
+	return s.sendScreen(name, to, message, text, markup, telebot.ModeHTML, telebot.NoPreview)
 }
 
-func generateStatusScreen(status *waqi.Status) string {
+func (s *botScreens) generateStatusScreen(status *waqi.Status) string {
 	// First row - title and hyperlink
 	text := ""
 	stationName := status.Station.Name
@@ -144,18 +152,18 @@ func generateStatusScreen(status *waqi.Status) string {
 	}
 
 	// Second row - status icon and text
-	text += fmt.Sprintf("Air quality: %s <code>%s</code>\n", getLevelIcon(status.Level), status.Level.String())
+	text += fmt.Sprintf("Air quality: %s <code>%s</code>\n", s.getLevelIcon(status.Level), status.Level.String())
 	text += "\n"
 
 	// Third and subsequent rows - parameters
 	unit := "μg/m3"
-	text = appendStatusParameter(text, "AQI  ", &status.AQI, nil, "", waqi.CalcAQILevel)
-	text = appendStatusParameter(text, "PM2.1", status.PM25, nil, unit, waqi.CalcPM25Level)
-	text = appendStatusParameter(text, "PM10 ", status.PM10, nil, unit, waqi.CalcPM10Level)
-	text = appendStatusParameter(text, "O3   ", status.O3, nil, unit, waqi.CalcO3Level)
-	text = appendStatusParameter(text, "NO2  ", status.NO2, nil, unit, waqi.CalcNO2Level)
-	text = appendStatusParameter(text, "SO2  ", status.SO2, nil, unit, waqi.CalcSO2Level)
-	text = appendStatusParameter(text, "CO   ", status.CO, nil, unit, waqi.CalcCOLevel)
+	text = s.appendStatusParameter(text, "AQI  ", &status.AQI, nil, "", waqi.CalcAQILevel)
+	text = s.appendStatusParameter(text, "PM2.1", status.PM25, nil, unit, waqi.CalcPM25Level)
+	text = s.appendStatusParameter(text, "PM10 ", status.PM10, nil, unit, waqi.CalcPM10Level)
+	text = s.appendStatusParameter(text, "O3   ", status.O3, nil, unit, waqi.CalcO3Level)
+	text = s.appendStatusParameter(text, "NO2  ", status.NO2, nil, unit, waqi.CalcNO2Level)
+	text = s.appendStatusParameter(text, "SO2  ", status.SO2, nil, unit, waqi.CalcSO2Level)
+	text = s.appendStatusParameter(text, "CO   ", status.CO, nil, unit, waqi.CalcCOLevel)
 
 	// Last row - date and time
 	text += fmt.Sprintf("\nUpdated at %s UTC", status.Time.Format("2006-Jan-2 15:04:05"))
@@ -163,7 +171,7 @@ func generateStatusScreen(status *waqi.Status) string {
 	return text
 }
 
-func generateDeltaStatusScreen(status *waqi.Status, prevStatus *waqi.Status) string {
+func (s *botScreens) generateDeltaStatusScreen(status *waqi.Status, prevStatus *waqi.Status) string {
 	// First row - title and hyperlink
 	text := ""
 	stationName := status.Station.Name
@@ -174,26 +182,26 @@ func generateDeltaStatusScreen(status *waqi.Status, prevStatus *waqi.Status) str
 	}
 
 	// Second row - status icon and text
-	text += fmt.Sprintf("Air quality: %s <code>%s</code>\n", getLevelIcon(status.Level), status.Level.String())
+	text += fmt.Sprintf("Air quality: %s <code>%s</code>\n", s.getLevelIcon(status.Level), status.Level.String())
 	text += "\n"
 
 	// Third and subsequent rows - parameters
 	unit := "μg/m3"
-	text = appendStatusParameter(text, "AQI  ", &status.AQI, &prevStatus.AQI, "", waqi.CalcAQILevel)
-	text = appendStatusParameter(text, "PM2.1", status.PM25, prevStatus.PM25, unit, waqi.CalcPM25Level)
-	text = appendStatusParameter(text, "PM10 ", status.PM10, prevStatus.PM10, unit, waqi.CalcPM10Level)
-	text = appendStatusParameter(text, "O3   ", status.O3, prevStatus.O3, unit, waqi.CalcO3Level)
-	text = appendStatusParameter(text, "NO2  ", status.NO2, prevStatus.NO2, unit, waqi.CalcNO2Level)
-	text = appendStatusParameter(text, "SO2  ", status.SO2, prevStatus.SO2, unit, waqi.CalcSO2Level)
-	text = appendStatusParameter(text, "CO   ", status.CO, prevStatus.CO, unit, waqi.CalcCOLevel)
+	text = s.appendStatusParameter(text, "AQI  ", &status.AQI, &prevStatus.AQI, "", waqi.CalcAQILevel)
+	text = s.appendStatusParameter(text, "PM2.1", status.PM25, prevStatus.PM25, unit, waqi.CalcPM25Level)
+	text = s.appendStatusParameter(text, "PM10 ", status.PM10, prevStatus.PM10, unit, waqi.CalcPM10Level)
+	text = s.appendStatusParameter(text, "O3   ", status.O3, prevStatus.O3, unit, waqi.CalcO3Level)
+	text = s.appendStatusParameter(text, "NO2  ", status.NO2, prevStatus.NO2, unit, waqi.CalcNO2Level)
+	text = s.appendStatusParameter(text, "SO2  ", status.SO2, prevStatus.SO2, unit, waqi.CalcSO2Level)
+	text = s.appendStatusParameter(text, "CO   ", status.CO, prevStatus.CO, unit, waqi.CalcCOLevel)
 
 	// Last row - date and time
 	text += fmt.Sprintf("\nUpdated at %s UTC", status.Time.Format("2006-Jan-2 15:04:05"))
-	
+
 	return text
 }
 
-func getLevelIcon(level waqi.Level) string {
+func (s *botScreens) getLevelIcon(level waqi.Level) string {
 	var icon emoji.Emoji = ""
 	switch level {
 	case waqi.GoodLevel:
@@ -219,7 +227,7 @@ func getLevelIcon(level waqi.Level) string {
 	return icon.String()
 }
 
-func appendStatusParameter(text, name string, value *float32, prevValue *float32, unit string, calcLevel func(float32) waqi.Level) string {
+func (s *botScreens) appendStatusParameter(text, name string, value *float32, prevValue *float32, unit string, calcLevel func(float32) waqi.Level) string {
 	if value != nil {
 		valueStr := fmt.Sprintf("%0.1f", *value)
 		const minValueLength = 6
@@ -234,7 +242,7 @@ func appendStatusParameter(text, name string, value *float32, prevValue *float32
 
 		iconStr := ""
 		if calcLevel != nil {
-			iconStr = getLevelIcon(calcLevel(*value))
+			iconStr = s.getLevelIcon(calcLevel(*value))
 		}
 
 		prevStr := ""
@@ -247,10 +255,10 @@ func appendStatusParameter(text, name string, value *float32, prevValue *float32
 	return text
 }
 
-func sendScreen(name string, bot *telebot.Bot, to telebot.Recipient, message telebot.Editable, text string, options ...interface{}) error {
+func (s *botScreens) sendScreen(name string, to telebot.Recipient, message telebot.Editable, text string, options ...interface{}) error {
 	var err error
 	if message != nil {
-		_, err = bot.Edit(message, text, options...)
+		_, err = s.bot.Edit(message, text, options...)
 		if err != nil {
 			// Suppress errors like:
 			//   Bad Request: message is not modified: specified new message content and reply markup are exactly
@@ -261,10 +269,10 @@ func sendScreen(name string, bot *telebot.Bot, to telebot.Recipient, message tel
 			}
 		}
 		msgID, chatID := message.MessageSig()
-		log.Printf("sent %s to %s updating %s from %d", name, to.Recipient(), msgID, chatID)
+		s.logger.Printf("sent %s to %s updating %s from %d", name, to.Recipient(), msgID, chatID)
 	} else {
-		_, err = bot.Send(to, text, options...)
-		log.Printf("sent %s to %s", name, to.Recipient())
+		_, err = s.bot.Send(to, text, options...)
+		s.logger.Printf("sent %s to %s", name, to.Recipient())
 	}
 
 	return err

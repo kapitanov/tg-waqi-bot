@@ -1,11 +1,13 @@
 package main
 
 import (
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
-	"github.com/spf13/viper"
-	"gopkg.in/tucnak/telebot.v2"
 	"os"
 	"path"
+
+	"github.com/spf13/viper"
+	"gopkg.in/tucnak/telebot.v2"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 )
 
 func configure() error {

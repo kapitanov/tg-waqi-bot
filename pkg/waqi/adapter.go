@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 )
@@ -24,12 +25,13 @@ type adapter interface {
 }
 
 type serviceAdapter struct {
-	url   string
-	token string
+	url    string
+	logger *log.Logger
+	token  string
 }
 
-func newServiceAdapter(url, token string) adapter {
-	return &serviceAdapter{url, token}
+func newServiceAdapter(url, token string, logger *log.Logger) adapter {
+	return &serviceAdapter{url, logger, token}
 }
 
 // GetByCity fetches current measurements for city
@@ -55,31 +57,31 @@ func (s *serviceAdapter) Get(path string) (*Status, error) {
 	u := fmt.Sprintf("%s/%s?token=%s", s.url, path, url.QueryEscape(s.token))
 	resp, err := http.Get(u)
 	if err != nil {
-		log.Printf("GET %s failed: %s", u, err)
+		s.logger.Printf("GET %s failed: %s", u, err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Printf("GET %s -> %d", u, resp.StatusCode)
+		s.logger.Printf("GET %s -> %d", u, resp.StatusCode)
 		return nil, Error("server returned non-successful response")
 	}
 
 	buffer, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Printf("GET %s failed: %s", u, err)
+		s.logger.Printf("GET %s failed: %s", u, err)
 		return nil, err
 	}
 
 	var raw responseJSON
 	err = json.Unmarshal(buffer, &raw)
 	if err != nil {
-		log.Printf("GET %s failed: %s", u, err)
+		s.logger.Printf("GET %s failed: %s", u, err)
 		return nil, err
 	}
 
 	if raw.Status == responseStatusError {
-		log.Printf("GET %s -> %d: %s", u, resp.StatusCode, raw.Message)
+		s.logger.Printf("GET %s -> %d: %s", u, resp.StatusCode, raw.Message)
 		return nil, Error(fmt.Sprintf("server error: %s", raw.Message))
 	}
 

@@ -367,5 +367,5 @@ Vue.component('v-app', App);
 
 window.addEventListener('load',
     () => {
-        new Vue({ el: '#main' });
+        new Vue({el: '#main'});
     });

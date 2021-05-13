@@ -2,15 +2,15 @@ package bot
 
 import (
 	"fmt"
-	pkgLog "github.com/kapitanov/tg-waqi-bot/pkg/log"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
-	"gopkg.in/tucnak/telebot.v2"
+	"log"
 	"strconv"
 	"sync"
 	"time"
-)
 
-var log = pkgLog.New("bot")
+	"gopkg.in/tucnak/telebot.v2"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
+)
 
 type options struct {
 	URL              string
@@ -18,6 +18,7 @@ type options struct {
 	DBPath           string
 	WAQI             waqi.Service
 	AllowedUsernames []string
+	Logger           *log.Logger
 }
 
 // Option is a configuration option for NewBot function
@@ -58,6 +59,13 @@ func AllowedUsernamesOption(allowedUsernames []string) Option {
 	}
 }
 
+// LoggerOption sets logger instance
+func LoggerOption(logger *log.Logger) Option {
+	return func(opts *options) {
+		opts.Logger = logger
+	}
+}
+
 // Bot wraps Bot logic
 type Bot interface {
 	// Start starts Bot
@@ -71,7 +79,8 @@ type Bot interface {
 func NewBot(fn ...Option) (Bot, error) {
 	// Generate options
 	opts := &options{
-		URL: telebot.DefaultApiURL,
+		URL:    telebot.DefaultApiURL,
+		Logger: log.Default(),
 	}
 	for _, f := range fn {
 		f(opts)
@@ -100,7 +109,7 @@ func NewBot(fn ...Option) (Bot, error) {
 	}
 
 	// Create database context
-	db, err := NewDB(opts.DBPath)
+	db, err := NewDB(opts.DBPath, opts.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +122,7 @@ func NewBot(fn ...Option) (Bot, error) {
 	}
 	tgBot, err := telebot.NewBot(botSettings)
 	if err != nil {
-		log.Printf("unable to connect to telegram: %s", err)
+		opts.Logger.Printf("unable to connect to telegram: %s", err)
 		db.Close()
 		return nil, err
 	}
@@ -127,6 +136,8 @@ func NewBot(fn ...Option) (Bot, error) {
 		WAQI:               opts.WAQI,
 		SubscriptionsMutex: &sync.Mutex{},
 		Subscriptions:      make(map[int]int),
+		Screens:            &botScreens{tgBot, opts.Logger},
+		Logger:             opts.Logger,
 	}
 	return bot, nil
 }

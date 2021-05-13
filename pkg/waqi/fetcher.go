@@ -1,15 +1,14 @@
 package waqi
 
 import (
-	pkgLog "github.com/kapitanov/tg-waqi-bot/pkg/log"
+	"log"
 	"sync"
 	"time"
 )
 
-var log = pkgLog.New("waqi")
-
 type fetcher struct {
 	adapter           adapter
+	logger            *log.Logger
 	listeners         map[int]*stationFetcher
 	mutex             *sync.Mutex
 	isRunning         bool
@@ -19,9 +18,10 @@ type fetcher struct {
 	done              chan bool
 }
 
-func newFetcher(adapter adapter) *fetcher {
+func newFetcher(adapter adapter, logger *log.Logger) *fetcher {
 	f := &fetcher{
 		adapter:       adapter,
+		logger:        logger,
 		listeners:     make(map[int]*stationFetcher),
 		mutex:         &sync.Mutex{},
 		sleepDuration: 10 * time.Minute,

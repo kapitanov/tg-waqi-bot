@@ -3,11 +3,14 @@ package bot
 import (
 	"errors"
 	"fmt"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
+	"log"
 	"os"
 	"path"
 	"time"
+
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
+	gormLogger "gorm.io/gorm/logger"
 )
 
 const (
@@ -70,23 +73,28 @@ type database struct {
 }
 
 // NewDB creates new instance of DB
-func NewDB(filepath string) (DB, error) {
+func NewDB(filepath string, logger *log.Logger) (DB, error) {
 	dir := path.Dir(filepath)
 	err := os.MkdirAll(dir, 0)
 	if err != nil {
-		log.Printf("unable to create directory \"%s\": %v", dir, err)
+		logger.Printf("unable to create directory \"%s\": %v", dir, err)
 		return nil, err
 	}
 
-	db, err := gorm.Open(sqlite.Open(filepath), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(filepath), &gorm.Config{
+		Logger: gormLogger.New(logger, gormLogger.Config{
+			LogLevel:                  gormLogger.Error,
+			IgnoreRecordNotFoundError: true,
+		}),
+	})
 	if err != nil {
-		log.Printf("unable to open database \"%s\": %v", filepath, err)
+		logger.Printf("unable to open database \"%s\": %v", filepath, err)
 		return nil, err
 	}
 
 	err = db.AutoMigrate(&chatEntity{})
 	if err != nil {
-		log.Printf("unable to migrate database \"%s\": %v", filepath, err)
+		logger.Printf("unable to migrate database \"%s\": %v", filepath, err)
 		return nil, err
 	}
 

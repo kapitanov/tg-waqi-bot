@@ -1,6 +1,7 @@
 package waqi
 
 import (
+	"log"
 	"strings"
 	"time"
 )
@@ -18,6 +19,7 @@ type options struct {
 	Token         string
 	CachePath     string
 	CacheDuration time.Duration
+	Logger        *log.Logger
 }
 
 // Normalize normalizes options
@@ -56,11 +58,19 @@ func CacheDurationOption(duration time.Duration) Option {
 	}
 }
 
+// LoggerOption sets logger instance
+func LoggerOption(logger *log.Logger) Option {
+	return func(opts *options) {
+		opts.Logger = logger
+	}
+}
+
 // NewService creates new instance of Service
 func NewService(fn ...Option) (Service, error) {
 	opts := &options{
 		URL:           DefaultURL,
 		CacheDuration: DefaultCacheDuration,
+		Logger:        log.Default(),
 	}
 	for _, f := range fn {
 		f(opts)
@@ -68,7 +78,7 @@ func NewService(fn ...Option) (Service, error) {
 
 	opts.Normalize()
 
-	adapter := newServiceAdapter(opts.URL, opts.Token)
+	adapter := newServiceAdapter(opts.URL, opts.Token, opts.Logger)
 	if opts.CachePath != "" {
 		var err error
 		adapter, err = newCachingServiceAdapter(adapter, opts.CachePath, opts.CacheDuration)
@@ -79,7 +89,7 @@ func NewService(fn ...Option) (Service, error) {
 
 	s := &service{
 		adapter: adapter,
-		fetcher: newFetcher(adapter),
+		fetcher: newFetcher(adapter, opts.Logger),
 	}
 	return s, nil
 }

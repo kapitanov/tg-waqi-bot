@@ -1,18 +1,21 @@
 package main
 
 import (
-	"github.com/kapitanov/tg-waqi-bot/pkg/api"
-	"github.com/kapitanov/tg-waqi-bot/pkg/bot"
-	pkgLog "github.com/kapitanov/tg-waqi-bot/pkg/log"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
-	"github.com/spf13/viper"
+	"log"
 	"os"
 	"os/signal"
+
+	"github.com/spf13/viper"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/api"
+	"github.com/kapitanov/tg-waqi-bot/pkg/bot"
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 )
 
-var log = pkgLog.New("main")
-
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lmsgprefix)
+	log.SetOutput(os.Stderr)
+
 	// Configure viper
 	err := configure()
 	if err != nil {
@@ -24,7 +27,8 @@ func main() {
 		waqi.URLOption(viper.GetString("WAQI_URL")),
 		waqi.TokenOption(viper.GetString("WAQI_TOKEN")),
 		waqi.CachePathOption(viper.GetString("WAQI_CACHE_PATH")),
-		waqi.CacheDurationOption(viper.GetDuration("WAQI_CACHE_DURATION")))
+		waqi.CacheDurationOption(viper.GetDuration("WAQI_CACHE_DURATION")),
+		waqi.LoggerOption(log.New(log.Writer(), "waqi: ", log.Flags())))
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +40,10 @@ func main() {
 	}()
 
 	// Create WebAPI service
-	webServer, err := api.NewServer(waqiService, viper.GetString("LISTEN_ADDR"))
+	webServer, err := api.NewServer(
+		waqiService,
+		viper.GetString("LISTEN_ADDR"),
+		log.New(log.Writer(), "api: ", log.Flags()))
 	if err != nil {
 		panic(err)
 	}
@@ -47,7 +54,8 @@ func main() {
 		bot.DBPathOption(viper.GetString("BOT_DB_PATH")),
 		bot.URLOption(viper.GetString("TELEGRAM_API_URL")),
 		bot.TokenOption(viper.GetString("TELEGRAM_API_TOKEN")),
-		bot.AllowedUsernamesOption(viper.GetStringSlice("TELEGRAM_USERNAMES")))
+		bot.AllowedUsernamesOption(viper.GetStringSlice("TELEGRAM_USERNAMES")),
+		bot.LoggerOption(log.New(log.Writer(), "bot: ", log.Flags())))
 	if err != nil {
 		panic(err)
 	}

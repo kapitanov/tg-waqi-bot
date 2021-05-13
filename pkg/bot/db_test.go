@@ -1,11 +1,14 @@
 package bot_test
 
 import (
-	"github.com/kapitanov/tg-waqi-bot/pkg/bot"
-	"github.com/stretchr/testify/assert"
+	"log"
 	"os"
 	"path"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/bot"
 )
 
 func TestGetOrCreate(t *testing.T) {
@@ -18,7 +21,7 @@ func TestGetOrCreate(t *testing.T) {
 		_ = os.Remove(filepath)
 	}()
 
-	db, err := bot.NewDB(filepath)
+	db, err := bot.NewDB(filepath, log.Default())
 	a.Nil(err)
 	defer db.Close()
 
@@ -56,7 +59,7 @@ func TestUpdate(t *testing.T) {
 		_ = os.Remove(filepath)
 	}()
 
-	db, err := bot.NewDB(filepath)
+	db, err := bot.NewDB(filepath, log.Default())
 	a.Nil(err)
 	defer db.Close()
 
@@ -99,7 +102,7 @@ func TestGetSubscribedStationIDs(t *testing.T) {
 		_ = os.Remove(filepath)
 	}()
 
-	db, err := bot.NewDB(filepath)
+	db, err := bot.NewDB(filepath, log.Default())
 	a.Nil(err)
 	defer db.Close()
 
@@ -155,7 +158,7 @@ func TestGetSubscribedChats(t *testing.T) {
 		_ = os.Remove(filepath)
 	}()
 
-	db, err := bot.NewDB(filepath)
+	db, err := bot.NewDB(filepath, log.Default())
 	a.Nil(err)
 	defer db.Close()
 

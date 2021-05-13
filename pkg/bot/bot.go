@@ -2,9 +2,12 @@ package bot
 
 import (
 	"fmt"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
-	"gopkg.in/tucnak/telebot.v2"
+	"log"
 	"sync"
+
+	"gopkg.in/tucnak/telebot.v2"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 )
 
 type botService struct {
@@ -15,17 +18,19 @@ type botService struct {
 	AllowedUsernames   map[string]interface{}
 	SubscriptionsMutex *sync.Mutex
 	Subscriptions      map[int]int
+	Logger             *log.Logger
+	Screens            *botScreens
 }
 
 // Start starts Bot
 func (s *botService) Start() error {
-	log.Printf("running as %s", s.Bot.Me.Username)
-	log.Printf("allowed users:")
+	s.Logger.Printf("running as %s", s.Bot.Me.Username)
+	s.Logger.Printf("allowed users:")
 	for key := range s.AllowedUserIDs {
-		log.Printf("  - %d", key)
+		s.Logger.Printf("  - %d", key)
 	}
 	for key := range s.AllowedUsernames {
-		log.Printf("  - @%s", key)
+		s.Logger.Printf("  - @%s", key)
 	}
 
 	// Configure bot
@@ -43,13 +48,13 @@ func (s *botService) Start() error {
 	s.SubscriptionsMutex.Lock()
 	defer s.SubscriptionsMutex.Unlock()
 	s.Subscriptions = m
-	log.Printf("got %d active subscriptions", len(m))
+	s.Logger.Printf("got %d active subscriptions", len(m))
 	for stationID := range m {
 		s.WAQI.Subscribe(stationID, s)
-		log.Printf("subscribed to station #%d", stationID)
+		s.Logger.Printf("subscribed to station #%d", stationID)
 	}
 
-	log.Printf("bot is up and running")
+	s.Logger.Printf("bot is up and running")
 	return nil
 }
 
@@ -65,7 +70,7 @@ func (s *botService) Close() {
 
 // onStart handles "/start" command
 func (s *botService) onStart(m *telebot.Message) {
-	log.Printf("got message \"%s\" from %d @%s", m.Text, m.Sender.ID, m.Sender.Username)
+	s.Logger.Printf("got message \"%s\" from %d @%s", m.Text, m.Sender.ID, m.Sender.Username)
 	s.handle(m, m.Chat, m.Sender, s.onStartCore)
 }
 
@@ -80,7 +85,7 @@ func (s *botService) onStartCore(arg interface{}, chat *chatEntity) error {
 		return err
 	}
 
-	err = sendWelcomeScreen(s.Bot, m.Chat, nil)
+	err = s.Screens.WelcomeScreen(m.Chat, nil)
 	if err != nil {
 		return err
 	}
@@ -90,7 +95,7 @@ func (s *botService) onStartCore(arg interface{}, chat *chatEntity) error {
 
 // onLocation handles location message
 func (s *botService) onLocation(m *telebot.Message) {
-	log.Printf("got location (%0.3f. %0.3f) from %d @%s", m.Location.Lat, m.Location.Lng, m.Sender.ID, m.Sender.Username)
+	s.Logger.Printf("got location (%0.3f. %0.3f) from %d @%s", m.Location.Lat, m.Location.Lng, m.Sender.ID, m.Sender.Username)
 	s.handle(m, m.Chat, m.Sender, s.onLocationCore)
 }
 
@@ -100,16 +105,16 @@ func (s *botService) onLocationCore(arg interface{}, _ *chatEntity) error {
 
 	status, err := s.WAQI.GetByGeo(m.Location.Lat, m.Location.Lng)
 	if err != nil {
-		log.Printf("unable to query status for location (%f, %f)", m.Location.Lat, m.Location.Lng)
-		return sendErrorScreen(s.Bot, m.Chat)
+		s.Logger.Printf("unable to query status for location (%f, %f)", m.Location.Lat, m.Location.Lng)
+		return s.Screens.ErrorScreen(m.Chat)
 	}
 
-	return sendLocationScreen(s.Bot, m.Chat, status, nil)
+	return s.Screens.LocationScreen(m.Chat, status, nil)
 }
 
 // onCallback handles callbacks
 func (s *botService) onCallback(c *telebot.Callback) {
-	log.Printf("got callback \"%s\" from %d @%s", c.Data, c.Sender.ID, c.Sender.Username)
+	s.Logger.Printf("got callback \"%s\" from %d @%s", c.Data, c.Sender.ID, c.Sender.Username)
 	s.handle(c, c.Message.Chat, c.Sender, s.onCallbackCore)
 }
 
@@ -165,12 +170,12 @@ func (s *botService) onCallbackSubscribe(c *telebot.Callback, d *callbackJSON, t
 	if !exists {
 		counter = 0
 		s.WAQI.Subscribe(d.StationID, s)
-		log.Printf("subscribed to station #%d", d.StationID)
+		s.Logger.Printf("subscribed to station #%d", d.StationID)
 	}
 	s.Subscriptions[d.StationID] = counter + 1
 
 	// Show notification
-	err = sendSubscribedScreen(s.Bot, to, status, c.Message)
+	err = s.Screens.SubscribedScreen(to, status, c.Message)
 	if err != nil {
 		return err
 	}
@@ -201,13 +206,13 @@ func (s *botService) onCallbackUnsubscribe(c *telebot.Callback, d *callbackJSON,
 	if exists && counter == 1 {
 		delete(s.Subscriptions, d.StationID)
 		s.WAQI.Unsubscribe(d.StationID, s)
-		log.Printf("unsubscribed from station #%d", d.StationID)
+		s.Logger.Printf("unsubscribed from station #%d", d.StationID)
 	} else {
 		s.Subscriptions[d.StationID] = counter - 1
 	}
 
 	// Show notification
-	err = sendLocationScreen(s.Bot, to, status, c.Message)
+	err = s.Screens.LocationScreen(to, status, c.Message)
 	if err != nil {
 		return err
 	}
@@ -225,9 +230,9 @@ func (s *botService) onCallbackRefresh(c *telebot.Callback, d *callbackJSON, to 
 
 	// Show notification
 	if chat.State == StateSubscribed && chat.SubscribedToStationID == d.StationID {
-		err = sendSubscribedScreen(s.Bot, to, status, c.Message)
+		err = s.Screens.SubscribedScreen(to, status, c.Message)
 	} else {
-		err = sendLocationScreen(s.Bot, to, status, c.Message)
+		err = s.Screens.LocationScreen(to, status, c.Message)
 	}
 	if err != nil {
 		return err
@@ -240,21 +245,21 @@ func (s *botService) onCallbackRefresh(c *telebot.Callback, d *callbackJSON, to 
 func (s *botService) handle(arg interface{}, c *telebot.Chat, u *telebot.User, f func(interface{}, *chatEntity) error) {
 	err := s.handleCore(arg, c, u, f)
 	if err != nil {
-		switch s := arg.(type) {
+		switch m := arg.(type) {
 		case *telebot.Message:
-			log.Printf("failed to handle message %d from %d: %s", s.ID, c.ID, err)
+			s.Logger.Printf("failed to handle message %d from %d: %s", m.ID, c.ID, err)
 			break
 		case *telebot.Callback:
-			log.Printf("failed to handle callback \"%s\" from %d: %s", s.ID, c.ID, err)
+			s.Logger.Printf("failed to handle callback \"%s\" from %d: %s", m.ID, c.ID, err)
 			break
 		default:
-			log.Printf("failed to handle message from %d: %s", c.ID, err)
+			s.Logger.Printf("failed to handle message from %d: %s", c.ID, err)
 			break
 		}
 
-		err = sendErrorScreen(s.Bot, c)
+		err = s.Screens.ErrorScreen(c)
 		if err != nil {
-			log.Printf("error while sending ErrorScreen: %s", err)
+			s.Logger.Printf("error while sending ErrorScreen: %s", err)
 		}
 	}
 }
@@ -265,7 +270,7 @@ func (s *botService) handleCore(arg interface{}, c *telebot.Chat, u *telebot.Use
 	_, usernameAllowed := s.AllowedUsernames[u.Username]
 
 	if !userIDAllowed && !usernameAllowed {
-		return sendForbiddenScreen(s.Bot, c)
+		return s.Screens.ForbiddenScreen(c)
 	}
 
 	chat, err := s.DB.GetOrCreate(c.ID, u.ID, u.Username)
@@ -290,7 +295,7 @@ func (s *botService) handleCore(arg interface{}, c *telebot.Chat, u *telebot.Use
 // prevStatus will be nil on first update
 // and not nil - on subsequent ones
 func (s *botService) Update(status *waqi.Status, prevStatus *waqi.Status) error {
-	log.Printf("UPDATE: was %s, became %s", status, prevStatus)
+	s.Logger.Printf("UPDATE: was %s, became %s", status, prevStatus)
 
 	chats, err := s.DB.GetSubscribedChats(status.Station.ID)
 	if err != nil {
@@ -298,7 +303,7 @@ func (s *botService) Update(status *waqi.Status, prevStatus *waqi.Status) error 
 	}
 
 	for _, chat := range chats {
-		err = sendUpdatedScreen(s.Bot, chat, status, prevStatus, nil)
+		err = s.Screens.UpdatedScreen(chat, status, prevStatus, nil)
 		if err != nil {
 			return err
 		}

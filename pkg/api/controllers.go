@@ -1,9 +1,11 @@
 package api
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 	"strconv"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
 )
 
 type restController struct {

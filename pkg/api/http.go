@@ -2,17 +2,17 @@ package api
 
 import (
 	"context"
-	"github.com/gin-gonic/gin"
-	pkgLog "github.com/kapitanov/tg-waqi-bot/pkg/log"
-	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
+	"log"
 	"mime"
 	"net/http"
 	"path"
 	"path/filepath"
 	"time"
-)
 
-var log = pkgLog.New("api")
+	"github.com/gin-gonic/gin"
+
+	"github.com/kapitanov/tg-waqi-bot/pkg/waqi"
+)
 
 // Server wraps WebAPI logic
 type Server interface {
@@ -24,7 +24,7 @@ type Server interface {
 }
 
 // NewServer configures new WebAPI server instance
-func NewServer(service waqi.Service, listenAddr string) (Server, error) {
+func NewServer(service waqi.Service, listenAddr string, logger *log.Logger) (Server, error) {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
@@ -55,6 +55,7 @@ func NewServer(service waqi.Service, listenAddr string) (Server, error) {
 	s := &server{
 		listenAddr: listenAddr,
 		done:       make(chan bool),
+		logger:     logger,
 	}
 	return s, nil
 }
@@ -63,6 +64,7 @@ type server struct {
 	listenAddr string
 	httpServer *http.Server
 	done       chan bool
+	logger     *log.Logger
 }
 
 // Start start WebAPI server
@@ -70,11 +72,11 @@ func (s *server) Start() {
 	s.httpServer = &http.Server{Addr: s.listenAddr}
 
 	go func() {
-		log.Printf("listening on \"%s\"\n", s.httpServer.Addr)
+		s.logger.Printf("listening on \"%s\"\n", s.httpServer.Addr)
 
 		err := s.httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatalf("could not listen on \"%s\": %v\n", s.httpServer.Addr, err)
+			s.logger.Fatalf("could not listen on \"%s\": %v\n", s.httpServer.Addr, err)
 		}
 
 		s.done <- true
@@ -89,7 +91,7 @@ func (s *server) Stop() {
 	s.httpServer.SetKeepAlivesEnabled(false)
 	err := s.httpServer.Shutdown(ctx)
 	if err != nil {
-		log.Fatalf("could not gracefully shutdown the server: %v\n", err)
+		s.logger.Fatalf("could not gracefully shutdown the server: %v\n", err)
 	}
 
 	<-s.done

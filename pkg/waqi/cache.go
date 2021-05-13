@@ -3,9 +3,10 @@ package waqi
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/syndtr/goleveldb/leveldb"
 	"strings"
 	"time"
+
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type cachedStatus struct {

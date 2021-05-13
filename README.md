@@ -1,9 +1,10 @@
 # tg-waqi-bot
 
-A telegram bot that provides current air quality status (with updates).
-Data is provided by [waqi.info](https://waqi.info/).
+A telegram bot that provides current air quality status (with updates). Data is provided
+by [waqi.info](https://waqi.info/).
 
-This bot is non-public due to waqi.info API restrictions, so you'll need to set up your own instance of this bot to use it.
+This bot is non-public due to waqi.info API restrictions, so you'll need to set up your own instance of this bot to use
+it.
 
 ## How to build and run
 
@@ -25,8 +26,8 @@ This bot is non-public due to waqi.info API restrictions, so you'll need to set 
 
    You'll need to:
 
-   * get an access token for api.waqi.info [here](https://aqicn.org/data-platform/token/)
-   * get a bot api token for Telegram [here](http://t.me/BotFather)
+    * get an access token for api.waqi.info [here](https://aqicn.org/data-platform/token/)
+    * get a bot api token for Telegram [here](http://t.me/BotFather)
 
 3. Build and run docker container:
 
